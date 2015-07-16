@@ -30,8 +30,8 @@ function JacobiRec(n::Int64, a::Float64, b::Float64)
 #Compute nodes and weights using recurrrence relation.
     x1 = HalfRec(n, a, b, 1)
     x2 = HalfRec(n, b, a, 0) 
-    x = vcat( -flipud(x2[1]) , x1[1] )
-    ders = vcat( flipud(x2[2]) , x1[2] )
+    x = vcat( -flipdim(x2[1],1) , x1[1] )
+    ders = vcat( flipdim(x2[2],1) , x1[2] )
     w = 1./((1-x.^2).*ders.^2)
     w = 2^(a+b+1)*gamma(2+a) * gamma(2+b) / (gamma(2+a+b)*(a+1)*(b+1)) * w ./ sum(w)
     return x, w
@@ -127,7 +127,7 @@ function asy1(n::Int64, a::Float64, b::Float64, nbdy)
     # First half (x > 0):
     t = tt[tt .<= pi/2]'
     mint = t[end-nbdy+1]
-    idx = 1:max(findfirst(float64(t .< mint))-1, 1)
+    idx = 1:max(findfirst(map(t .< mint,float64))-1, 1)
 
     dt = 1.0; counter = 0
     # Newton iteration
@@ -149,7 +149,7 @@ function asy1(n::Int64, a::Float64, b::Float64, nbdy)
     tmp = a; a = b; b = tmp
     t = pi - tt[1:(n-length(x))]'
     mint = t[nbdy]
-    idx = max(findfirst(float64(t .> mint)), 1):length(t)
+    idx = max(findfirst(map(t .> mint,float64)), 1):length(t)
 
     dt = 1.0; counter = 0;
     # Newton iteration

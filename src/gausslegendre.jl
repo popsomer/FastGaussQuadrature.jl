@@ -122,16 +122,18 @@ function rec( n::Int64 )
 # COMPUTE GAUSS-LEGENDRE NODES AND WEIGHTS USING NEWTON'S METHOD. THREE-TERM RECURENCE 
 # IS USED FOR EVALUATION. COMPLEXITY O(n^2). 
     hN = mod(n,2)
-    # Initial guesses: 
-    x0 = asy(n)[1]; x = x0[(n-hN)/2+1:n]   
+    mid1::Int64 = (n-hN)/2; 
+    mid2::Int64 = (n+hN)/2;
+    # Initial guesses:
+    x0 = asy(n)[1]; x = x0[mid1+1:n]   
     # Perform Newton to find zeros of Legendre polynomial:
     PP = innerRec( n, x ); dx = -PP[1]./PP[2]; x += dx
     # One more Newton for derivatives: 
     PP = innerRec( n, x ); dx = -PP[1]./PP[2]; x += dx
     #PP = (n<45)? innerRec( n, x ) : PP
     # Use symmetry to get the other Legendre nodes and weights: 
-    nodes = vcat( -x[(n+hN)/2:-1:hN+1] , x )
-    weights = 2./((1-nodes.^2).*vcat( PP[2][(n+hN)/2:-1:1+hN] , PP[2] ).^2)
+    nodes = vcat( -x[mid2:-1:hN+1] , x )
+    weights = 2./((1-nodes.^2).*vcat( PP[2][mid2:-1:1+hN] , PP[2] ).^2)
     return nodes, weights
 end
 
