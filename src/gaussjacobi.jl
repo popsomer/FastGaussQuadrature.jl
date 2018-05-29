@@ -2,7 +2,7 @@ gaussjacobi(n::Number, a::Number, b::Number) =
     gaussjacobi(Int(n),Float64(a),Float64(b))
 
 
-function gaussjacobi(n::Int, a::Float64, b::Float64)
+function gaussjacobi(n::Integer, a::Float64, b::Float64)
     #GAUSS-JACOBI QUADRATURE NODES AND WEIGHTS
     if n < 0
         error("gaussjacobi($n,$a,$b) not defined: n must be positive.")
@@ -33,13 +33,13 @@ function gaussjacobi(n::Int, a::Float64, b::Float64)
     end
 end
 
-function JacobiRec(n::Int, a::Float64, b::Float64)
+function JacobiRec(n::Integer, a::Float64, b::Float64)
     #Compute nodes and weights using recurrrence relation.
     x11, x12 = HalfRec(n, a, b, 1)
     x21, x22 = HalfRec(n, b, a, 0)
 
-    x = Array{Float64}(n)
-    w = Array{Float64}(n)
+    x = Array{Float64}(uninitialized, n)
+    w = Array{Float64}(uninitialized, n)
     m1 = length(x11)
     m2 = length(x21)
     sum_w = 0.0
@@ -67,7 +67,7 @@ function JacobiRec(n::Int, a::Float64, b::Float64)
     x, w
 end
 
-function HalfRec(n::Int, a::Float64, b::Float64, flag)
+function HalfRec(n::Integer, a::Float64, b::Float64, flag)
     # HALFREC  Jacobi polynomial recurrence relation.
     # Asymptotic formula - only valid for positive x.
     r = (flag == 1) ? (ceil(n / 2):-1:1) : (floor(n / 2):-1:1)
@@ -76,15 +76,15 @@ function HalfRec(n::Int, a::Float64, b::Float64, flag)
     a1 = .25 - a^2
     b1 = .25 - b^2
     c1² = c1^2
-    x = Array{Float64}(m)
+    x = Array{Float64}(uninitialized, m)
     @inbounds for i in 1:m
         C = muladd(2.0, r[i], a - .5) * (π * c1)
         C_2 = 0.5 * C
         x[i] = cos(muladd(c1², muladd(-b1, tan(C_2), a1 * cot(C_2)), C))
     end
 
-    P1 = Array{Float64}(m)
-    P2 = Array{Float64}(m)
+    P1 = Array{Float64}(uninitialized, m)
+    P2 = Array{Float64}(uninitialized, m)
     # Loop until convergence:
     for _ in 1:10
         innerJacobiRec!(n, x, a, b, P1, P2)
@@ -178,17 +178,17 @@ function JacobiAsy(n, a, b)
     x, w
 end
 
-function asy1(n::Int, a::Float64, b::Float64, nbdy)
+function asy1(n::Integer, a::Float64, b::Float64, nbdy)
     # Algorithm for computing nodes and weights in the interior.
 
     # Approximate roots via asymptotic formula: (Gatteschi and Pittaluga, 1985)
     K = (2*(n:-1:1).+a.-0.5).*pi./(2*n+a+b+1)
-    tt = K .+ (1/(2*n+a+b+1)^2).*((0.25-a^2).*cot.(0.5.*K).-(0.25-b^2).*tan.(0.5*K))
+    tt = K .+ (1/(2*n+a+b+1)^2).*((0.25-a^2).*cot.(0.5 .* K).-(0.25-b^2).*tan.(0.5*K))
 
     # First half (x > 0):
     t = tt[tt .<= pi/2]'
     mint = t[end-nbdy+1]
-    idx = 1:max(findfirst(t .< mint)-1, 1)
+    idx = 1:max(findfirst(vec(t) .< mint)-1, 1)
 
     dt = 1.0
     counter = 0
@@ -205,13 +205,13 @@ function asy1(n::Int, a::Float64, b::Float64, nbdy)
 
     # Store:
     x = cos.(t)
-    w = 1./vals[2].^2
+    w = 1 ./ vals[2].^2
 
     # Second half (x < 0):
     tmp = a; a = b; b = tmp
-    t = pi - tt[1:(n-length(x))]'
+    t = pi .- tt[1:(n-length(x))]'
     mint = t[nbdy]
-    idx = max(findfirst(t .> mint), 1):length(t)
+    idx = max(findfirst(vec(t) .> mint), 1):length(t)
 
     dt = 1.0; counter = 0;
     # Newton iteration
@@ -226,10 +226,10 @@ function asy1(n::Int, a::Float64, b::Float64, nbdy)
     t += vals[1]./vals[2]                                 # Newton update.
 
     # Store:
-    [(-).(cos.(vec(t)));vec(x)],[1./vec(vals[2]).^2;vec(w)]
+    [(-).(cos.(vec(t)));vec(x)],[1 ./vec(vals[2]).^2;vec(w)]
 end
 
-function feval_asy1(n::Int, a::Float64, b::Float64, t, idx)
+function feval_asy1(n::Integer, a::Float64, b::Float64, t, idx)
     # Evaluate the interior asymptotic formula at x = cos(t).
 
     # Number of terms in the expansion:
@@ -239,7 +239,7 @@ function feval_asy1(n::Int, a::Float64, b::Float64, t, idx)
     onesT = ones(length(t))'; onesM = ones(M); MM = collect(0:M-1);
 
     # The sine and cosine terms:
-    alpha = (0.5*(2*n+a+b+1+MM))*onesT .* (onesM*t) - 0.5*(a+0.5)*pi
+    alpha = @. (0.5*(2*n+a+b+1+MM))*onesT * (onesM*t) - 0.5*(a+0.5)*pi
     cosA = cos.(alpha); sinA = sin.(alpha)
 
     sinT = onesM*sin.(t)
@@ -256,24 +256,24 @@ function feval_asy1(n::Int, a::Float64, b::Float64, t, idx)
     P1 = [1 cumprod(vec,2)]
     P1[3:4:end] = -P1[3:4:end]
     P1[4:4:end] = -P1[4:4:end]
-    P2 = eye(M)
+    P2 = Matrix(1.0I, M, M)
     for l = 0:M-1
         j = transpose(0:(M-l-2))
-        vec = (.5+b+j).*(.5-b+j)./(j+1)./(2*n+a+b+j+l+2)
-        P2[l+1+(1:length(j)),l+1] = cumprod(vec,2)
+        vec = @. (0.5+b+j)*(0.5-b+j)/(j+1)/(2*n+a+b+j+l+2)
+        P2[(l+1).+(1:length(j)),l+1] = cumprod(vec,2)
     end
     PHI = repmat(P1,M,1).*P2
 
     j = transpose(0:M-2)
-    vec = (.5+a+j).*(.5-a+j)./(j+1)./(2*(n-1)+a+b+j+2)
+    vec = @. (0.5+a+j)*(0.5-a+j)/(j+1)/(2*(n-1)+a+b+j+2)
     P1 = [1 cumprod(vec,2)]
     P1[3:4:end] = -P1[3:4:end]
     P1[4:4:end] = -P1[4:4:end]
-    P2 = eye(M)
+    P2 = Matrix(1.0I, M, M)
     for l = 0:M-1
         j = transpose(0:(M-l-2))
-        vec = (.5+b+j).*(.5-b+j)./(j+1)./(2*(n-1)+a+b+j+l+2)
-        P2[l+1+(1:length(j)),l+1] = cumprod(vec,2)
+        vec = @. (0.5+b+j)*(0.5-b+j)/(j+1)/(2*(n-1)+a+b+j+l+2)
+        P2[(l+1).+(1:length(j)),l+1] = cumprod(vec,2)
     end
     PHI2 = repmat(P1,M,1).*P2
 
@@ -293,8 +293,8 @@ function feval_asy1(n::Int, a::Float64, b::Float64, t, idx)
         if m - 1 > 10 && norm(dS1[idx] + dS2[idx], Inf) < eps(Float64) / 100
             break
         end
-        S = S + dS1 + dS2
-        S2 = S2 + dS12 + dS22
+        S = S .+ dS1 .+ dS2
+        S2 = S2 .+ dS12 .+ dS22
         SC[1:m,:] = SC[1:m,:].*cosT
     end
 
@@ -324,16 +324,16 @@ function feval_asy1(n::Int, a::Float64, b::Float64, t, idx)
     S2 = C2*S2
 
     # Use relation for derivative:
-    ders = (n.*(a.-b.-(2*n+a+b).*cos.(t)).*vals .+ 2.*(n+a).*(n+b).*S2)./(2*n+a+b)./sin.(t)
+    ders = (n.*(a.-b.-(2*n+a+b).*cos.(t)).*vals .+ 2 .*(n+a).*(n+b).*S2)./(2*n+a+b)./sin.(t)
     t .= abs.( t )
-    denom = 1./real.(sin.(t/2).^(a+0.5).*cos.(t./2).^(b+0.5))
+    denom = 1 ./ real.(sin.(t/2).^(a+0.5).*cos.(t ./ 2).^(b+0.5))
     vals = vals.*denom
     ders = ders.*denom
 
     return (vals, ders)
 end
 
-function boundary(n::Int, a::Float64, b::Float64, npts)
+function boundary(n::Integer, a::Float64, b::Float64, npts)
 # Algorithm for computing nodes and weights near the boundary.
 
     # Use Newton iterations to find the first few Bessel roots:
@@ -342,7 +342,7 @@ function boundary(n::Int, a::Float64, b::Float64, npts)
 
     # Approximate roots via asymptotic formula: (see Olver 1974)
     phik = jk/(n + .5*(a + b + 1))
-    x = cos.( phik .+ ((a^2-0.25).*(1.-phik.*cot.(phik))./(8*phik) .- 0.25.*(a^2-b^2).*tan.(0.5.*phik))./(n + 0.5*(a + b + 1))^2 )
+    x = cos.( phik .+ ((a^2-0.25).*(1 .-phik.*cot.(phik))./(8*phik) .- 0.25.*(a^2-b^2).*tan.(0.5.*phik))./(n + 0.5*(a + b + 1))^2 )
 
     dx = 1.0; counter = 0;
     # Newton iteration:
@@ -362,24 +362,24 @@ function boundary(n::Int, a::Float64, b::Float64, npts)
     ders = ders[npts:-1:1]
 
     # Revert to x-space:
-    w = 1./((1-x.^2).*ders.^2)
+    w = @. 1 /((1-x^2)*ders^2)
     return x, w
 end
 
-function JacobiGW( n::Int64, a::Float64, b::Float64 )
+function JacobiGW( n::Integer, a::Float64, b::Float64 )
     # Golub-Welsh for Gauss--Jacobi quadrature. This is used when max(a,b)>5.
     ab = a + b;
     ii = 2:n-1;
-    abi = 2*ii + ab;
+    abi = 2*ii .+ ab;
     aa = Float64[(b - a)/(2 + ab);
-          (b^2 - a^2)./((abi - 2).*abi);
+          (b^2 - a^2)./((abi .- 2).*abi);
           (b^2 - a^2)./((2*n - 2+ab).*(2*n+ab))] ::Vector{Float64}
     bb = Float64[2*sqrt( (1 + a)*(1 + b)/(ab + 3))/(ab + 2) ;
-          2.*sqrt.(ii.*(ii .+ a).*(ii .+ b).*(ii .+ ab)./(abi.^2 .- 1))./abi] ::Vector{Float64}
+          2 .*sqrt.(ii.*(ii .+ a).*(ii .+ b).*(ii .+ ab)./(abi.^2 .- 1))./abi] ::Vector{Float64}
     TT = SymTridiagonal(aa, bb)  # Jacobi matrix.
     x, V = eig( TT )                       # Eigenvalue decomposition.
     # Quadrature weights:
-    w = V[1,:].^2.*( 2^(ab+1)*gamma(a+1)*gamma(b+1)/gamma(2+ab) );
+    w = V[1,:].^2 .*( 2^(ab+1)*gamma(a+1)*gamma(b+1)/gamma(2+ab) );
     w .= w./sum(w);
     x, vec(w)
 end
