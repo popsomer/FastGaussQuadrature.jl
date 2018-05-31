@@ -3,9 +3,10 @@
 # Test for gausslegendre().
 
 
-for n=2:10  # check all special cases
-    x, w = gausslegendre(n)
-    @test dot( w,(x.^2)) ≈ 2/3
+for ν=2:10  # check all special cases
+    let (x, w) = gausslegendre(ν)
+        @test dot( w,(x.^2)) ≈ 2/3
+    end
 end
 
 tol = 1e-14
